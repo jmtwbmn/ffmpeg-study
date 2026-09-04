@@ -1,0 +1,9 @@
+*.rgb
+*.yuv
+*.mp4
+*.avi
+*.flv
+*.raw
+build/
+*.o
+*.out
