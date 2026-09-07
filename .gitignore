@@ -1,4 +1,16 @@
+<<<<<<< HEAD
 *.mp4
 *.yuv
 *.265
 *.rgb
+=======
+*.rgb
+*.yuv
+*.mp4
+*.avi
+*.flv
+*.raw
+build/
+*.o
+*.out
+>>>>>>> 76d6a00c3c94fc5f5196c9cca5e02a72c51c66c1
