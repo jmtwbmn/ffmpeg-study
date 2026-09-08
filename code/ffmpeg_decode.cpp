@@ -16,6 +16,10 @@ int main(int argc,char** argv)
         std::cout<<"打开文件失败"<<std::endl;
         return -1;
     }
+	if(argc<2)
+	{	
+	  std::cout<<"用法：~/test <视频文件> "<<std::endl;
+	}
     avformat_find_stream_info(fmt_ctx,nullptr);
 
     std::cout << "文件名: " << argv[1] << std::endl;
