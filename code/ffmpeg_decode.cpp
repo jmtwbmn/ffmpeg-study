@@ -11,52 +11,26 @@ extern "C"{
  * FFmpeg 解码程序 —— 复习笔记
  * ================================
  *
- * 1. 打开媒体文件
- *    avformat_open_input()
- *
- * 2. 获取媒体流信息
- *    avformat_find_stream_info()
- *
- * 3. 遍历 streams
- *    找到视频流和音频流
- *
- * 4. 根据 codec_id 找解码器
- *    avcodec_find_decoder()
- *
- * 5. 创建并配置解码器上下文
- *    avcodec_alloc_context3()
- *    avcodec_parameters_to_context()
- *
- * 6. 打开解码器
- *    avcodec_open2()
- *
- * 7. 循环读取压缩数据
- *    av_read_frame()
- *
- * 8. Packet 送入解码器
- *    avcodec_send_packet()
- *
- * 9. 从解码器取出 Frame
- *    avcodec_receive_frame()
- *
- * 10. 输出原始数据
- *     视频 → YUV
- *     音频 → PCM
- *
- * 最重要：
- *
- *     文件
- *      ↓
- *   AVPacket
- *      ↓
- *    解码器
- *      ↓
- *    AVFrame
- *      ↓
- *   YUV / PCM
- *
- * AVPacket = 压缩数据
- * AVFrame  = 解码后的原始数据
+打开文件
+ ↓
+获取流信息
+ ↓
+遍历 Stream
+ ↓
+区分视频 / 音频
+ ↓
+找解码器 + 打开
+ ↓
+读取 AVPacket
+ ↓
+解码
+ ↓
+AVFrame
+ ├─ 视频 → YUV
+ └─ 音频 → PCM
+
+
+
  */
 
 
