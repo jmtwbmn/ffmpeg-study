@@ -3,7 +3,7 @@
 
 int main(int argc, char** argv)
 {
-	//argc
+	//argc是传参个数，第二个指向指针字符数组
 	//1.初始化SDL
 	if(SDL_Init(SDL_INIT_VIDEO)!=0)
 	{
