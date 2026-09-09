@@ -61,7 +61,7 @@ int main(int argc, char* argv[])
             {
                 running = false;
             }
-
+            //keydown就是检测键盘按下，keyup检测键盘抬起
             if (event.type == SDL_KEYDOWN)
             {
                 if (event.key.keysym.sym == SDLK_ESCAPE)
