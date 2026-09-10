@@ -1,16 +1,32 @@
-<<<<<<< HEAD
-*.mp4
-*.yuv
-*.265
-*.rgb
-=======
-*.rgb
-*.yuv
+# Video
 *.mp4
 *.avi
+*.mkv
+*.mov
 *.flv
+*.265
+
+# Audio
+*.mp3
+*.wav
 *.raw
+
+# Image
+*.png
+*.jpg
+*.jpeg
+*.bmp
+
+# Raw video data
+*.yuv
+*.rgb
+
+# Build files
 build/
 *.o
 *.out
->>>>>>> 76d6a00c3c94fc5f5196c9cca5e02a72c51c66c1
+
+# Executable files
+sdl_image
+sdl_black_window
+ffmpeg_decode

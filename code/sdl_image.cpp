@@ -4,6 +4,12 @@
 int main(int argc, char** argv)
 {
 	//argc是传参个数，第二个指向指针字符数组
+	if(argc<2)
+	{
+		std::cout<<" usage: ./sdl_image <bmp file>"<<std::endl;
+		return -1;
+	}
+
 	//1.初始化SDL
 	if(SDL_Init(SDL_INIT_VIDEO)!=0)
 	{
@@ -54,7 +60,8 @@ int main(int argc, char** argv)
 
 
 	//4.加载bmp图片
-	SDL_Surface* surface =SDL_LoadBMP("test.bmp");
+	SDL_Surface* surface =SDL_LoadBMP(argv[1]);
+	//argv[1]表示第二个参数，也就是文件的路径
 		if(surface == nullptr)
 		{
 			std::cout<<"bmp failed to download"
