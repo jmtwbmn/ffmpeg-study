@@ -8,7 +8,7 @@ extern "C"
 #include <libavutil/avutil.h>
 #include <libswresample/swresample.h>
 }
-int main(int argc,const char** argv[])
+int main(int argc,const char* argv[])
 {
 
     //1.初始化上下文
@@ -82,7 +82,7 @@ int main(int argc,const char** argv[])
 
     AVChannelLayout out_chlayout;
     av_channel_layout_default(&out_chlayout,2);
-
+    //创建swr上下文
     if(swr_alloc_set_opts2(
         &swr_ctx,
         &out_chlayout,
@@ -99,6 +99,15 @@ int main(int argc,const char** argv[])
             return -1;
         }
 
+        //初始化ffmpeg重采样上下文
+        if(swr_init(swr_ctx)<0)
+        {
+            std::cout<<"swr初始化失败"<<std::endl;
+            return -1;
+        }
+
+
+
     //创建pcm文件
     std::ofstream pcm_file(
         "/mnt/hgfs/ffmpeg_assets/output1.pcm",
@@ -110,15 +119,13 @@ int main(int argc,const char** argv[])
         return -1;
     }
 
-    uint8_t* output_buffer = nullptr;
-    int output_linesize = 0;
-    int max_output_samples = 4096;
+   
 
     //分配缓冲区
     int max_output_samples = 4096;
 
     uint8_t* output_buffer = nullptr;
-    int puput_linesize = 0;
+    int output_linesize = 0;
 
     if(av_samples_alloc(
         &output_buffer,
@@ -131,7 +138,7 @@ int main(int argc,const char** argv[])
             std::cout<<"PCM缓冲区创建失败"<<std::endl;
             return -1;
         }
-
+    //主循环读取并写入pcm
     while(av_read_frame(fmt_audio_ctx,packet)>=0)
     {
        
@@ -240,7 +247,10 @@ int main(int argc,const char** argv[])
     av_freep(&output_buffer);
     swr_free(&swr_ctx);
     av_channel_layout_uninit(&out_chlayout);
-
+    av_frame_free(&frame);
+    av_packet_free(&packet);
+    avcodec_free_context(&audio_codec_ctx);
+    avformat_close_input(&fmt_audio_ctx);
 
     return 0;
 
