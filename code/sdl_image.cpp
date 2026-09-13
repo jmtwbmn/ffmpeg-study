@@ -1,5 +1,7 @@
 #include<iostream>
 #include<SDL2/SDL.h>
+#include<SDL2/SDL_image.h>
+
 
 int main(int argc, char** argv)
 {
@@ -18,11 +20,17 @@ int main(int argc, char** argv)
 				 <<std::endl;
 		return -1;
 	}
-
-
+	//初始化image配置
+	if(IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG) ==0)
+	{
+		std::cout<<"配置image失败"
+				<<IMG_GetError()
+				<<std::endl;
+		return -1;
+	}
 	//2.创建窗口
 	SDL_Window* window = SDL_CreateWindow(
-		"SDL_Image Player",
+		"Yasina Player",
 		SDL_WINDOWPOS_CENTERED,
 		SDL_WINDOWPOS_CENTERED,
 		800,
@@ -60,7 +68,7 @@ int main(int argc, char** argv)
 
 
 	//4.加载bmp图片
-	SDL_Surface* surface =SDL_LoadBMP(argv[1]);
+	SDL_Surface* surface =IMG_Load(argv[1]);
 	//argv[1]表示第二个参数，也就是文件的路径
 		if(surface == nullptr)
 		{
@@ -139,6 +147,7 @@ int main(int argc, char** argv)
 		//9.释放资源
 		SDL_DestroyTexture(texture);
 		SDL_DestroyRenderer(renderer);
+		IMG_Quit();
 		SDL_Quit();
 	
 
