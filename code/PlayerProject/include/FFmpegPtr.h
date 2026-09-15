@@ -58,6 +58,25 @@ struct AVFormatContextDeleter {
 };
 using AVFormatContextPtr = std::unique_ptr<AVFormatContext, AVFormatContextDeleter>; 
 
+//AVPacket
+    struct AVPacketDeleter{
+        void operator()(AVPacket* pkt) const{
+            if(pkt) av_packet_free(&pkt);
+        }
+    };
+ using ACPacketPtr = std::unique_ptr<AVPacket,AVPacketDeleter>;
+
+ //AVCodecParameters
+    struct AVCodecParametersDeleter{
+        void operator()(AVCodecParameters* codec_par) const{
+            if(codec_par) avcodec_parameters_free(&codec_par);
+        }
+    };
+using AVCodecParametersPtr = std::unique_ptr<AVCodecParameters,AVCodecParametersDeleter>;
+
+
+
+
 // ================== SDL 封装 ==================
 
 // SDL_Window
