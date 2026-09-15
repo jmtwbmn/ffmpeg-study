@@ -1,0 +1,32 @@
+# Video
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.flv
+*.265
+
+# Audio
+*.mp3
+*.wav
+*.raw
+
+# Image
+*.png
+*.jpg
+*.jpeg
+*.bmp
+
+# Raw video data
+*.yuv
+*.rgb
+
+# Build files
+build/
+*.o
+*.out
+
+# Executable files
+sdl_image
+sdl_black_window
+ffmpeg_decode

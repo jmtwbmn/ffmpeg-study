@@ -1,0 +1,332 @@
+
+
+导引
+1. ffmpeg 命令分类查询
+2. ffplay 播放快捷键
+3. ffplay 缩放播放
+4. ffplay 命令‑主要选项总结
+5. ffplay 命令‑高级选项
+6. ffplay 命令播放
+7. 关于数据类型
+8. ffplay 简单过滤器 (了解即可)
+9. ffmpeg 命令参数说明
+
+
+
+
+
+
+# ffmpeg命令分类查询
+-------------------------
+-version        显示版本
+-buildconf      显示编译配置
+-formats        显示可用格式(muxers+demuxers)
+-muxers         显示可用复用器
+-demuxers       显示可用解复用器
+-codecs         显示可用编解码器(decoders+encoders)
+-decoders       显示可用解码器
+-encoders       显示可用编码器
+
+-bsfs           显示可用比特流filter
+-protocols      显示可用的协议
+-filters        显示可用的过滤器
+-pix_fmts       显示可用的像素格式
+-layouts        显示标准声道名称
+-sample_fmts    显示可用的音频采样格式
+-colors         显示可用的颜色名称
+
+
+
+查看具体分类支持的参数
+语法：ffmpeg -h type=name
+eg:   ffmpeg -h muxer=flv
+就是可以额外配置的参数,如调整倍速，码率
+用法:
+	#1、筛选出名称包含264的编码器
+	ffmpeg -encoders | grep 264
+	#2、查看 libx264 编码器可配置参数
+	ffmpeg -h encoder=libx264
+
+
+
+
+
+
+# ffplay 播放快捷键
+------------------------------
+q, ESC	        退出播放
+f	            全屏切换
+p, 空格(SPC)	暂停
+m	            静音切换
+9	            减少音量
+0	            增加音量
+/	            减少音量
+*	            增加音量
+a	            循环切换音频流
+v	            循环切换视频流
+t	            循环切换字幕流
+c	            循环切换节目
+w	            循环切换过滤器或显示模式
+s	            逐帧播放
+← / →	        向后 / 向前拖动10秒
+↓ / ↑	        向后 / 向前拖动1分钟
+鼠标右键单击	拖动与显示宽度对应百分比的文件进行播放
+鼠标左键双击	全屏切换
+
+
+#ffplay缩放播放
+固定宽高  			ffplay -vf scale=1280:720 test.mp4
+#宽固定，高自动(推荐，不变形)   ffplay -vf scale=1280:-1 test.mp4
+小窗口虚拟机用  		ffplay -vf scale=800:-1 test.mp4
+
+
+
+
+
+ffplay命令‑主要选项总结
+------------------------------------------------
+-x width	        强制设置播放窗口宽度
+-y height	        强制设置播放窗口高度
+-video_size size	帧尺寸(WxH)，仅用于YUV等原始裸视频流
+-pixel_format format	设置像素格式
+-fs	                全屏模式启动
+-an(audio none)	        禁用音频（不播放声音）
+-vn	                禁用视频（只播放音频）
+-sn(subtitiles)	        禁用字幕（不显示字幕）
+-ss pos	            从指定时间点开始播放，支持 时:分:秒
+-t duration	        设置播放的时长
+-bytes	        按字节进行定位拖动（0=off 1=on -1=auto）
+-seek_interval interval	自定义左/右键定位拖动间隔(秒)，默认10秒
+-nodisp	        关闭图形化显示窗口，视频不显示
+-noborder	    无边框窗口
+-volume vol	    设置起始音量。音量范围[0 ~100]
+-f fmt	        强制使用设置的格式进行解析
+-window_title title	设置窗口标题
+-loop number	设置播放循环次数
+-showmode mode	设置显示模式：0视频，1音频波形，2音频频谱
+-vf filtergraph	设置视频滤镜
+-af filtergraph	设置音频滤镜
+
+
+示例：
+#调整大小
+ffplay -400 -300 -an test.mp4
+#静音播放视频
+ffplay -an tet.mp4
+#从第10秒开始播放
+ffplay -ss 10 test.mp4 /ffplay 00:00:55 test.mp4
+#播放YUV原始视频流
+ffplay -pixel_format yuv420p -video_size 320x240 -framerate 5 test.yuv
+
+
+ffplay命令-高级选项
+*-stats	        打印回放统计信息，默认开启；-nostats关闭
+-fast	        多媒体兼容优化
+-genpts	        生成pts
+*-sync type	    同步时钟：audio/video/ext，默认audio
+*-ast 索引	    指定音频流
+*-vst 索引	    指定视频流
+*-sst 索引	    指定字幕流
+*-autoexit	    播放完毕自动退出
+*-exitonkeydown	    按下任意键盘按键退出播放
+-exitonmousedown	按下鼠标任意按键退出播放
+*-codec:a/v/s 解码器名	强制指定解码器，a音频、v视频、s字幕
+*-acodec	解码器名	    强制指定音频解码器
+*-vcodec	解码器名	    强制指定视频解码器
+*-scodec	解码器名	    强制指定字幕解码器
+-autorotate	        根据元数据自动旋转视频，0关闭，1开启(默认)
+-framedrop	        音视频不同步时丢视频帧，‑noframedrop关闭
+-infbuf	            不限制输入缓冲区大小，‑noinfbuf关闭
+
+
+
+
+
+
+ffplay命令播放
+--------------------
+#播放本地文件
+ffplay -window_title "test time" -ss 2 -t 10 -autoexit test.mp4
+ffplay buweishui.mp3
+
+#播放网络流
+ffplay -window_title "rtmp stream" 
+rtmp://202.69.69.180:443/webcast/bshdlive-pc
+
+#强制解码器
+mpeg4解码器： ffplay -vcodec mpeg4 test.mp4
+h264解码器： ffplay -vcodec h264 test.mp4
+
+#禁用音频或视频
+禁用音频： ffplay test.mp4 -an
+禁用视频： ffplay test.mp4 -vn
+
+#播放YUV数据
+ffplay -pixel_format yuv420p -video_size 320x240 -framerate 5 yuv420p_320x240.yuv
+
+#播放RGB数据
+ffplay -pixel_format rgb24 -video_size 320x240 -i rgb24_320x240.rgb
+ffplay -pixel_format rgb24 -video_size 320x240 -framerate 5 -i rgb24_320x240.rgb
+
+#播放PCM数据
+ffplay -ar 48000 -ac 2 -f f32le 48000_2_f32le.pcm
+-ar	set audio sampling rate (in Hz)
+-ac	set number of audio channels
+
+
+关于数据类型
+-----------------------
+数据类型	属于	        压缩        核心含义
+RGB	  视频图像原始像素	未压缩	红‑绿‑蓝三原色
+YUV	  视频图像原始像素	未压缩	亮度 + 色度，可降采样节省空间
+PCM	  音频原始采样	        未压缩	声音波形裸数据
+H.264	  视频压缩编码	        已压缩	压缩码流
+MP4	  封装容器	        已压缩	装 h264/aac 的外壳文件
+
+
+
+
+ffplay简单过滤器(了解即可)
+--------------------------------
+#视频旋转
+ffplay -i test.mp4 -vf transpose=1
+
+#视频反转
+ffplay test.mp4 -vf hflip
+ffplay test.mp4 -vf vflip
+
+#视频旋转和反转
+ffplay test.mp4 -vf hflip,transpose=1
+
+#音频变速播放
+ffplay -i test.mp4 -af atempo=2
+
+#视频变速播放
+ffplay -i test.mp4 -vf setpts=PTS/2
+
+#音视频同时变速
+ffplay -i test.mp4 -vf setpts=PTS/2 -af atempo=2
+
+
+
+ffmpeg命令参数说明
+-----------------------
+#主要参数
+‑i	设定输入流
+‑f	设定输出格式(format)(同时-f和后缀以-f设置的为准)
+‑ss	开始时间
+‑t	时间长度
+
+#音频参数
+‑aframes	设置要输出的音频帧数
+‑b:a	音频码率
+‑ar	设定采样率
+‑ac	设定声音的Channel数
+‑acodec	设定声音编解码器，如果用copy表示原始编解码数据必须被拷贝。
+‑an	不处理音频
+‑af	音频过滤器
+
+#视频参数
+‑vframes	设置要输出的视频帧数
+‑b	设定视频码率
+‑b:v	视频码率
+‑r	设定帧速率
+‑s	设定画面的宽与高
+‑vn	不处理视频
+‑aspect aspect	设置横纵比 4:3  16:9 或 1.3333 1.7777
+‑vcodec	设定视频编解码器，如果用copy表示原始编解码数据必须被拷贝。
+‑vf	视频过滤器
+
+#更多参考
+http://www.ffmpeg.org/ffmpeg.html
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
