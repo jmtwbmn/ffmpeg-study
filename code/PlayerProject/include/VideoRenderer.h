@@ -2,8 +2,8 @@
 
 extern "C"
 {
-#include<libavcodec/avcodec.h>
-#include<libswscale/swscale.h>
+ #include<libavcodec/avcodec.h>
+ #include<libswscale/swscale.h>
 
 }
 #include<thread>
@@ -26,10 +26,10 @@ class VideoRenderer{
     VideoRenderer& operator = (const VideoRenderer&) = delete;
 
     //对外提供的初始化接口      --    保存音频指针为了找到音频时钟
-    bool init(AVCodecParameters* codec_par, AudioPlayer* audioPlayer);
+    bool init(AVCodecParameters* video_codec_par, AudioPlayer* audioPlayer);
 
     //对外提供入队接口
-    void pushFrame(AVFramePtr frame);
+    void pushvideoFrame(AVFramePtr video_frame);
 
     //调用函数
     void play();
@@ -39,9 +39,9 @@ class VideoRenderer{
 
     private:
     //核心函数
-    bool sws_init(AVCodecParametersPtr codec_par);
+    bool sws_init(AVCodecParameters* codec_par);
     bool sdl_init(int width,int height);
-    void renderloop();
+    bool renderloop();
 
     //队列
     ThreadSafeQueue<AVFramePtr> videoframeQueue;
@@ -53,9 +53,10 @@ class VideoRenderer{
     SDL_TexturePtr texture;
     SwsContextPtr sws_ctx;
     AVFramePtr yuv420p;
+    AVFramePtr video_frame;
     int width=0;
     int height=0;
-    AVPixelFormat pix_foramt = AV_PIX_FMT_NONE;
+    AVPixelFormat pix_format = AV_PIX_FMT_NONE;
 
     private:
     //线程状态

@@ -1,4 +1,4 @@
-
+#pragma once
 
 //RALL封装内存管理
 

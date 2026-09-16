@@ -1,5 +1,5 @@
 
-#pragma
+#pragma  once                       //避免多次重复定义
 
 #include<iostream>
 #include "FFmpegPtr.h"
@@ -11,8 +11,8 @@ extern "C"
 class Decoder {
 
     public:
-        Decoder() = default;
-        virtual ~Decoder() = default;
+        Decoder();
+        virtual ~Decoder();
         
         //禁用拷贝
         Decoder(const Decoder&) = delete;
