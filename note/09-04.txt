@@ -1,0 +1,82 @@
+
+
+导引：ffmpeg命令提取音视频数据
+
+
+
+
+
+
+
+
+# ffmpeg命令提取音视频数据
+---------------------------------
+
+1、保留封装格式
+#提取音频
+ffmpeg -i test.mp4 -acodec copy -vn audio.mp4
+#提取视频
+ffmpeg -i test.mp4 -vcodec copy -an video.mp4
+
+ 2、提取视频
+#保留编码格式
+ffmpeg -i test.mp4 -vcodec copy -an test_copy.h264
+#强制格式
+ffmpeg -i test.mp4 -vcodec libx264 -an test.h264
+
+ 3、提取音频
+#保留编码格式
+ffmpeg -i test.mp4 -acodec copy -vn test.aac
+#强制格式
+ffmpeg -i test.mp4 -acodec libmp3lame -vn test.mp3
+
+参数说明
+-i：指定输入文件
+copy：直接拷贝流，不重新编码，速度快
+-vn：video none，去除视频流
+-an：audio none，去除音频流
+-acodec：音频编码器
+-vcodec：视频编码器
+
+提取YUV
+#提取3秒数据，分辨率和源视频一致
+ffmpeg -i test.mp4 -t 3 -pix_fmt yuv420p yuv420p_orig.yuv
+#提取3秒数据，分辨率转为320x240
+ffmpeg -i test.mp4 -t 3 -pix_fmt yuv420p -s 320x240 yuv420p_320x240.yuv
+
+提取RGB
+#提取3秒数据，分辨率转为320x240
+ffmpeg -i test.mp4 -t 3 -pix_fmt rgb24 -s 320x240 rgb24_320x240.rgb
+
+RGB和YUV之间的转换
+ffmpeg -f rawvideo -s 320x240 -pix_fmt yuv420p -i yuv420p_320x240.yuv -pix_fmt rgb24 rgb24_320x240_2.rgb
+
+**例子:ffmpeg -s 320x240 -pix_fmt yuv420p -i out.yuv -s 1280x720 -pix_fmt rgb24 rgb24_1280x720.rgb
+
+
+*ffmpeg -s 320x240 -pix_fmt yuv420p -i out.yuv -vf scale=1280:720 -pix_fmt rgb24 rgb24_1280x720.rgb
+
+**第一种-s 在 -i的后面，属于隐形滤镜，进行缩放
+第二种是滤镜写法，通过scale进行缩放，更直观
+
+
+
+提取PCM
+ffmpeg -i buweishui.mp3 -ar 48000 -ac 2 -f s16le 48000_2_s16le.pcm
+ffmpeg -i buweishui.mp3 -ar 48000 -ac 2 -sample_fmt s16 out_s16.wav
+ffmpeg -i buweishui.mp3 -ar 48000 -ac 2 -codec:a pcm_s16le out2_s16le.wav
+ffmpeg -i buweishui.mp3 -ar 48000 -ac 2 -f f32le 48000_2_f32le.pcm
+
+
+
+
+
+
+
+
+
+
+
+
+
+
