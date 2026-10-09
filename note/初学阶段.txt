@@ -1,0 +1,6 @@
+# FFmpeg 需要肌肉记忆的基础命令
+ffmpeg -i input.mp4                    # 查看媒体文件信息
+ffmpeg -i input.mp4 output.avi         # 格式转换
+ffmpeg -i input.mp4 -vn output.mp3     # 提取音频（-vn 关闭视频流）
+ffmpeg -i input.mp4 -an -c:v copy output.mp4  # 提取视频(无音频)，流复制不重新编码
+ffmpeg -i input.mp4 -ss 00:01:00 -t 00:00:30 output.mp4 # 截取片段
