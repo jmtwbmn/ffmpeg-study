@@ -10,3 +10,4 @@
 //10-15 进度较少,player.h/.cpp以及videoplayer.h.
 //10-16 进度较少，继续完善videoplayer.cpp
 //10-17 完成palyer.cpp和main.cpp
+//10-19 第二阶段的优化，新增键盘事件的暂停和播放

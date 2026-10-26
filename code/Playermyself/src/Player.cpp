@@ -16,6 +16,10 @@ bool Player::file_deal(const std::string& file)
         return false;
     }
     av_fmt_ctx.reset(tmp_ctx);
+    //返回总时长
+    if(av_fmt_ctx->duration != AV_NOPTS_VALUE)
+     m_duration = av_fmt_ctx->duration / (double)AV_TIME_BASE;
+
     //查找流信息
     if(!findstream())
     return false;
@@ -76,14 +80,16 @@ void Player::demuxloop()
 {   
     std::cout<<"解复用线程启动"<<std::endl;
     AVPacketPtr packet(av_packet_alloc());
-
     while(m_isRunning)
     {
-        if(m_isPaused ){
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    //加锁保护不互斥
+    if(m_isSeeking || m_isPaused)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(5);
         continue;
-     }
-     
+    }
+    std::lock_guard<std::mutex> lock(m_seekMutex);
+
      int ret = av_read_frame(av_fmt_ctx.get(),packet.get());
      if(ret == AVERROR_EOF)
      {
@@ -118,7 +124,7 @@ void Player::demuxloop()
     }
     av_packet_unref(packet.get());
     }
-
+   }
 }
 
 void Player::play()
@@ -129,7 +135,6 @@ void Player::play()
     m_isPaused = false;
     m_videoplayer.play();
     m_audioplayer.play();
-    demuxThread = std::thread(&Player::demuxloop,this);
     std::cout<<"解复用线程开始"<<std::endl;
 }
 
@@ -154,4 +159,44 @@ void Player::stop()
     m_videoplayer.stop();
     m_audioplayer.stop();
     
+}
+
+
+//进度条
+int Player::getWindowHeight() const {return m_videoplayer.getHeight();}
+int Player::getWindowWidth() const {return m_videoplayer.getWdith();}
+SDL_Renderer* Player::getRenderer() const {return m_videoplayer.getRenderer();}
+double Player::getDuration() const {return m_duration;}
+double Player::getCurrentTime() const {return m_audioplayer.get_clock();}
+bool Player::seek(double time)
+{   
+    if(time<0.0) time =0.0;
+    if(m_duration >0.0 && time> m_duration) time = m_duration;
+
+    //调用函数，清理队列，清理缓冲区，重置音频钟
+    m_isSeeking = true;
+    {
+    std::lock_guard<std::mutex> lock(m_seekMutex);
+        
+    int64_t ts = (int64_t)(time * AV_TIME_BASE);
+    if(av_seek_frame(av_fmt_ctx.get(),-1,ts,AVSEEK_FLAG_BACKWARD)<0)
+    {
+        m_isSeeking = false;
+        return false;
+    }
+    m_audioplayer.clearqueue();
+    m_videoplayer.clear();
+
+    m_audio_decoder->flush();
+    m_video_decoder->flush();
+   }
+    m_auidoplayer.set_clock(time);
+    m_isSeeking = false;
+    std::cout<<"已跳转到%d"<<time<<std::endl;
+    return true;
+}
+
+void Player::renderVideoFrame()
+{
+    m_videoplayer.renderoneframe();
 }

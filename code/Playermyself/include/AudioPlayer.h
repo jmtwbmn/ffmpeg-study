@@ -29,7 +29,7 @@ public:
     void setvolume(float volume);
     double getAudioClock() const;
     void clearqueue();
-
+    void get_clock();
 private:
 //内部具体函数和参数
     bool sdl_init();

@@ -1,3 +1,5 @@
 {
-    "cmake.sourceDirectory": "/home/jiangxing/ffmpeg_study/code/PlayerProject"
+    "cmake.sourceDirectory": "/home/jiangxing/ffmpeg_study/code/PlayerProject",
+    "workbench.colorTheme": "Light Modern",
+    "window.autoDetectColorScheme": false
 }

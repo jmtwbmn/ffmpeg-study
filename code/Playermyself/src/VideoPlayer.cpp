@@ -112,7 +112,30 @@ bool VideoPlayer::sdl_init()
         {
             return;
         }
-       
+        
+        //音视频同步
+        double video_pts_seconds =0.0;
+        if(video_frame->pts != AV_NOPTS_VALUE)
+        {
+            video_pts_seconds = video_frame->pts * av_q2d(m_timebase);
+        }
+        double audio_clock = 0.0;
+        if(m_audioplayer)
+        {
+            audio_clock = m_audioplayer->get_clock();
+        }
+        double delay = video_pts_seconds - audio_clock;
+        if(delay>0)
+        {
+            int sleep_ms = static_cast<int>(delay * 1000);
+            if(sleep_ms>0)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+            }
+        }
+        else if(delay< -0.1)
+        return;
+
         int scale_output = sws_scale(
                 sws_ctx.get(),
                 video_frame->data,
@@ -126,7 +149,7 @@ bool VideoPlayer::sdl_init()
         {
             std::cerr<<"视频帧渲染失败"<<std::endl;
         }
-        if(SDL_UpdateTexture(
+        if(SDL_UpdateYUVTexture(
             m_texture.get(),
             nullptr,
             yuv420p->data[0],yuv420p->linesize[0],
@@ -146,9 +169,9 @@ bool VideoPlayer::sdl_init()
             std::cerr<<"SDL_RenderCopy失败"<<SDL_GetError()<<std::endl;
             return;
         }
-        SDL_RenderPresent(m_renderer.get());
+        
     }
-}
+
 
 //主线程渲染循环
 void VideoPlayer::renderloop()
@@ -160,9 +183,7 @@ void VideoPlayer::renderloop()
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         continue;
     }
-    renderoneloop();
-    //帧率控制，后续在这里进行audio_clock音视频同步
-    std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    renderoneframe();
    }
 
 
@@ -173,7 +194,7 @@ void VideoPlayer::renderloop()
         m_isRunning = true;
         m_isPaused = false;
         //启动主线程循环
-        m_renderThread = std::thread(&VideoPlayer::renderloop,this);
+        
         std::cout<<"videoplayer开始播放"<<std::endl;
     };
     void VideoPlayer::pause()
@@ -197,5 +218,5 @@ void VideoPlayer::renderloop()
     {
         videoframeQueue.clear();
     }
-
+    
 

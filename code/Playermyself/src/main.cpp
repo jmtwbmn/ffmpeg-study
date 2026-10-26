@@ -5,6 +5,7 @@
 #include<SDL2/SDL.h>
 #include<SDL2/SDL_events.h>
 #include "Player.h"
+#include "ProgressBar.h"
 int main(int argc, char const *argv[])
 {   
     //检测命令行参数，传入视频路径
@@ -16,6 +17,7 @@ int main(int argc, char const *argv[])
     std::string url = argv[1];
     //实例化
     Player player;
+    ProgressBar progressBar;
     //打开文件并初始化模块
     if(!player.file_deal(url))
     {
@@ -37,6 +39,14 @@ int main(int argc, char const *argv[])
                 std::cout<<"用户手动退出"<<std::endl;
                 isRunning = false;
             }
+            //进度条seek
+            if(event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT)
+            {
+            if(progressBar.mouse_up(event.button.x, event.button.y))
+                {
+                    player.seek(progressBar.getSeekTime());   
+                }
+            }
             //键盘事件：esc退出
             if(event.type == SDL_KEYDOWN)
             {   
@@ -47,8 +57,13 @@ int main(int argc, char const *argv[])
                 }
             }
         }
-    }
+    player.renderVideoFrame();              //渲染视频
+    progressBar.updateprogress(player.getCurrentTime(),player.getDuration());
+    progressBar.draw();                     //渲染进度条
+    SDL_RenderPresent(player.getRenderer());//一次性展示
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+   
     //停止线程，释放资源
     player.stop();
     std::cout<<"程序正常退出"<<std::endl;

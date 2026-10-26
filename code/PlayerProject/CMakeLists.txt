@@ -35,6 +35,7 @@ add_executable(PlayerProject
     src/Decoder.cpp
     src/AudioPlayer.cpp
     src/VideoRenderer.cpp
+    src/ProgressBar.cpp
 )
 
 target_link_libraries(PlayerProject

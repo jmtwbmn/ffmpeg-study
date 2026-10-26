@@ -118,3 +118,8 @@ void AudioPlayer::pushaudioFrame(AVFramePtr audio_frame)
   
     audioframeQueue.push(std::move(audio_frame));
 }
+
+void AudioPlayer::get_clock() const
+{
+   return audio_clock.load();
+}
