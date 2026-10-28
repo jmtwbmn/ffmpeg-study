@@ -41,7 +41,7 @@ class ThreadSafeQueue
     void close()
     {
         std::lock_guard<std::mutex> lock(mtx);
-        m_isstoped == true;
+        m_isstoped = true;
         cond_var.notify_all();
         //唤醒所有消费者程序结束
         
@@ -71,6 +71,26 @@ class ThreadSafeQueue
 
         return true;
     }
+    ////新增:非阻塞版本,队列空立刻返回 false,绝不等待。给主线程和音频回调这类不能阻塞的地方用
+    bool try_pop(T& value)
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        if(data_queue.empty() || m_isstoped) return false;
+        value = std::move(data_queue.front());
+        data_queue.pop();
+        return true; 
+    }
+    //新增:只看队首,不取出。回调 fn 在锁内执行,拿到信息后立刻释放锁。
+    //给"还没到播放时刻,不想消费队列"的场景用
+    template <typename Fn>
+    bool peek(Fn&& fn)
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        if(data_queue.empty() || m_isstoped) return false;
+        fn(data_queue.front());
+        return true;
+    }
+
 
     //-----------------------状态查询
 
@@ -78,6 +98,10 @@ class ThreadSafeQueue
     bool empty() const{
         std::lock_guard<std::mutex>lock(mtx);
         return data_queue.empty();
+    }
+    std::size_t size() const{
+        std::lock_guard<std::mutex> lock(mtx);
+        return data_queue.size();
     }
 
     private:
@@ -89,5 +113,4 @@ class ThreadSafeQueue
     std::queue<T> data_queue;
 
     bool m_isstoped = false;
-
-};
+ };

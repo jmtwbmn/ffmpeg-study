@@ -1,0 +1,213 @@
+
+# 编码 / 封装 / 协议 三层结构
+=====================================
+
+核心：三层独立，可以自由组合。
+同一份 H.264 码流，能装进 MP4（点播）、FLV（直播）、TS（广播）。
+箱子换了，衣服还是那件。
+
+        +---------------------------+
+        |  1 编码格式 Codec         |   怎么压缩
+        |  H.264 H.265 AV1 AAC      |
+        +---------------------------+
+        |  2 封装容器 Container     |   怎么打包
+        |  FLV TS MP4 MKV           |
+        +---------------------------+
+        |  3 传输协议 Protocol      |   怎么运送
+        |  RTMP HTTP-FLV HLS SRT    |
+        +---------------------------+
+
+生活类比：
+  编码 = 把衣服抽真空（压缩）
+  封装 = 选纸箱还是行李箱（打包）
+  协议 = 选顺丰还是同城跑腿（运送）
+
+ffmpeg 参数就是三层的开关：
+  ffmpeg -i in.mp4 -c:v libx264 -f flv rtmp://...
+                    ^编码         ^封装  ^协议
+
+看到参数就知道在操作哪一层。
+
+
+# 各格式的取舍（为什么这么多格式）
+=====================================
+
+格式    强在哪                            用在哪
+MP4     有索引 moov，能随便拖              点播、下载
+FLV     流式友好，延迟低                  直播
+TS      固定188字节小包，丢一个不毁全局    广播、弱网
+MKV     万能，多音轨多字幕                收藏、压制
+
+MP4 不能直接直播的原因：
+索引 moov 通常在文件末尾，播放器要下完才知道怎么播。
+FLV 没这个问题，边来边解。
+
+
+# ffmpeg / ffplay / ffprobe 三工具关系
+=====================================
+
+重点：三者是并列的独立程序，不是流水线。
+ffplay 不依赖 ffprobe，把 ffprobe 删了 ffplay 照样能播。
+
+   输入            工具            出口
+  [文件/流]  -->  [ ffmpeg ]  -->  [文件/流]
+  [文件/流]  -->  [ ffplay ]  -->  [  屏幕 ]
+  [文件/流]  -->  [ ffprobe ]  -->  [终端文字]
+
+三者能力相似，是因为都链接同一套库
+(libavformat / libavcodec / libavutil / libswscale / libswresample)，
+不是因为互相传数据。
+
+类比：
+  ffmpeg  = 厨师，把食材做成菜
+  ffplay  = 食客，把菜吃掉
+  ffprobe = 营养师，只分析成分，不吃也不做
+
+
+# 三条完整链路
+=====================================
+
+ffmpeg 推流：
+  读文件 -> 解封装 -> 解码 -> 编码 -> 封装 -> 传输(推)
+                                      ^ 这一步容易漏
+
+ffplay 拉流：
+  读地址 -> 传输(拉) -> 解封装 -> 解码 -> 渲染
+                        ^ 这一步容易漏
+
+ffprobe 分析：
+  读 -> 解封装 -> 读参数 -> 打印文字
+
+
+# ffprobe 能看到什么
+=====================================
+
+三层可见度：
+  封装  可以，完整      format_name
+  编码  可以，完整      codec_name / profile / pix_fmt
+  协议  只能看到名字    从 URL 前缀和 "from 'rtmp://...'" 看出
+
+原因：ffprobe 站在「解封装之后」看东西。
+协议握手、分块、重传，在它看到数据之前已经发生完了。
+
+想看协议细节 -> tcpdump / wireshark / 服务器日志
+
+三个粒度：
+  容器   -show_format    时长、总码率、格式名
+  流     -show_streams   编码、分辨率、采样率、时间基
+  帧/包  -show_frames    每帧 pts/dts、关键帧标记、大小
+         -show_packets
+
+
+# ffprobe 常用命令
+=====================================
+
+# 一屏看全（最实用）
+ffprobe -v error -show_format -show_streams input.mp4
+
+# 只看编码，干净输出
+ffprobe -v error -select_streams v:0 \
+        -show_entries stream=codec_name,profile,width,height,pix_fmt \
+        -of default=noprint_wrappers=1 input.mp4
+
+# 看关键帧位置（GOP 长度 = 相邻关键帧间隔）
+ffprobe -v error -select_streams v:0 -show_frames \
+        -show_entries frame=pts_time,key_frame -of csv=p=0 input.mp4 | grep ',1$'
+
+# 看每个包的 pts/dts（排查音画不同步）
+ffprobe -v error -show_packets -of compact input.mp4 | head -20
+
+# 网络流要加超时，不然会一直挂着
+ffprobe -timeout 5000000 rtmp://localhost:1935/live/test
+
+
+# 踩坑记录：-c copy 花屏
+=====================================
+
+现象：
+  ffmpeg -c copy 推到 RTMP，ffplay 拉流画面是彩色噪点。
+  但流信息显示正常：h264 1280x720 25fps + aac 44100。
+
+原因：H.264 有两种封装格式，MP4 和 FLV 用的不一样。
+
+  MP4 / AVCC 格式（长度前缀）
+    [4字节长度][NAL数据][4字节长度][NAL数据]...
+    SPS/PPS 不在码流里，单独存在 extradata (avcC box)
+
+  FLV / Annex-B 格式（起始码）
+    [00 00 00 01][SPS][00 00 00 01][PPS][00 00 00 01][IDR]...
+    SPS/PPS 直接插在码流里，每个关键帧前带一份
+
+-c copy 只搬 packet 字节，不重排 NAL 单元。
+FLV 收到「长度前缀格式」的包，按「起始码格式」解析
+-> 找不到 NAL 边界，也找不到 SPS/PPS
+-> 解码器拿不到参数 -> 花屏
+
+证据：ffplay 显示 h264 (Main)，但源文件是 h264 (High)。
+      profile 变了，说明 SPS 没传到，ffplay 用了默认值。
+
+-c copy 的安全边界：
+  同容器转换        OK     MP4->MP4、TS->TS
+  MP4->TS           一般   通常可以，ffmpeg 自动插 bsf
+  MP4->FLV          不行   AVCC 和 Annex-B 不兼容
+  改分辨率/码率     不行
+  换编码格式        不行
+
+解决方案：
+  1. 完整转码（最稳，重新生成 SPS/PPS）
+     ffmpeg -re -i in.mp4 -c:v libx264 -preset ultrafast \
+            -tune zerolatency -c:a aac -f flv rtmp://...
+
+  2. 视频 copy + bsf 转换，音频转码（省 CPU）
+     ffmpeg -re -i in.mp4 -c:v copy -bsf:v h264_mp4toannexb \
+            -c:a aac -f flv rtmp://...
+
+  h264_mp4toannexb 的作用：
+  把长度前缀换成起始码，并把 SPS/PPS 插到每个关键帧前面。
+
+判断标准（三个都满足才敢 -c copy）：
+  - 编码格式被目标容器支持？（FLV 只吃 H.264 / AAC）
+  - 封装格式一致？（AVCC vs Annex-B）
+  - 参数能承载？（B 帧、10bit、多音轨）
+
+
+# 本地推拉流验证流程
+=====================================
+
+# 终端1：启动服务器（mediamtx，单文件二进制，解压即用）
+cd ~ && ./mediamtx
+
+# 终端2：推流（-re 按原始帧率推，不加会一秒推完）
+ffmpeg -re -i input.mp4 -c:v libx264 -preset ultrafast -tune zerolatency \
+       -c:a aac -f flv rtmp://localhost:1935/live/test
+
+# 终端3：拉流
+ffplay rtmp://localhost:1935/live/test
+
+三个终端要同时开着。推流端一停，拉流端就断了。
+
+mediamtx 默认端口：
+  1935 RTMP / 8888 HLS / 8554 RTSP / 8889 WebRTC
+默认允许任意路径推流，流名随便起。
+
+
+# 记忆锚点
+=====================================
+
+不要背格式列表，记住三件事：
+
+  1. 三层的职责
+     编码压缩 / 封装打包 / 协议运送
+
+  2. ffmpeg 参数对应哪一层
+     -c:v     -> 编码
+     -f       -> 封装
+     URL前缀  -> 协议
+
+  3. 排查顺序
+     这是什么文件？    ffprobe 看 format_name
+     里面什么编码？    ffprobe 看 codec_name
+     要送到哪？        决定协议 + 封装
+     目标能装下吗？    装不下就转码
+
+散点会忘，结构不会。

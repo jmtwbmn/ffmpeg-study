@@ -2,6 +2,7 @@
 #include<SDL2/SDL.h>
 #include<iostream>
 #include<atomic>
+#include<vector>   //新增:下面用到了 std::vector,原来靠 <queue> 间接引入,不可靠
 #include "FFmpegPtr.h"
 #include "ThreadSafeQueue.h"
 
@@ -28,20 +29,20 @@ class AudioPlayer{
     public:
     void pause();
     void play();
-    void resume();
     void clearqueue();
+    void set_clock(double seconds);
     void stop();
     void setvolume(float volume);
     double get_clock() const;
     void pushaudioFrame(AVFramePtr audio_frame);
+    std::atomic<double> audio_clock {0.0};
     
-    
-    
+    void setTimeBase(AVRational tb,double base);
+    void setLive(bool live){m_isLive = live;}
     //参数
     private:
     bool swr_init(AVCodecParameters* audio_codec_par);
     bool sdl_init();
-    std::atomic<bool> m_isRunning{false};
     std::atomic<bool> m_isPaused{true};
 
     ThreadSafeQueue<AVFramePtr> audioframeQueue;
@@ -50,10 +51,11 @@ class AudioPlayer{
     int m_outsamplerate = 44100;
     int m_outchannel = 2;
     double m_volume = 1;
+    //拉流时不能用点播的固定参数了
+    std::vector<uint8_t> m_pcmBuf;   //当前帧转好的pcm
+    std::size_t m_pcmPos = 0;       //这个缓冲区用掉的字节数
 
-    //音频时钟“音频同步核心”    在音频线程的回调函数写入更新，在视频线程读取用于同步
-    std::atomic<double> audio_clock{0.0};            //当前播放到第几秒
-    std::atomic<uint64_t> m_playerbyte = 0;          //已经输送了多少字节
+    //音频时钟:在音频线程的回调函数写入,在视频线程读取用于同步
     double m_bytepersecond = 0;                      //每秒传输的字节数(计算时间)
 
     //核心函数
@@ -65,4 +67,11 @@ class AudioPlayer{
     //回调函数
     static void sdlaudiocallback(void* userdata,Uint8* stream,int len);
 
+    //时钟锚点定到音频帧pts
+    AVRational m_audioTimeBase{1,1000};
+    double m_baseTime = 0.0;
+    double m_framePts = 0.0;    //当前帧在流里的秒数
+    uint64_t m_frameBytes =0;   //本帧消费的字节数
+
+    bool m_isLive = false;
 };

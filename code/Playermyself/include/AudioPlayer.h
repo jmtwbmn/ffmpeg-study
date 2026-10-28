@@ -21,20 +21,20 @@ AudioPlayer& operator=(const AudioPlayer&) = delete;
 
 public:
 //对外接口
-    bool init(AVCodecParameters* audio_codec_par);
-    void pushaudioFrame(AVFrame* audio_frame);
+    bool audio_init(AVCodecParameters* audio_codec_par);
+    void pushaudioFrame(AVFramePtr audio_frame);
     void play();
     void stop();
     void pause();
     void setvolume(float volume);
     double getAudioClock() const;
-    double clearqueue();
-
+    void clearqueue();
+    void get_clock();
 private:
 //内部具体函数和参数
-    void sdl_init();
-    void swr_init(AVCodecParameters* audio_codec_par);
-    void handleaudio(uint8_t* stream,int len);
+    bool sdl_init();
+    bool swr_init(AVCodecParameters* audio_codec_par);
+    bool handleAudio(uint8_t* stream,int len);
     static void audiocallback(void* usedata,uint8_t* stream,int len);
 
     SwrContextPtr swr_ctx;
@@ -44,9 +44,9 @@ private:
     double m_bytepersecond = 0;
     std::atomic<uint64_t>m_playerbyte = 0;
     std::atomic<double> audio_clock{0.0};
-    int outputsamplerate = 44100;
+    int m_outputsamplerate = 44100; 
     int m_channel = 2;
     double m_volume = 1;
-    ThreadSafeQueue<AVFramePtr> threadaudioQueue;
+    ThreadSafeQueue<AVFramePtr> audioframeQueue;
 
 };

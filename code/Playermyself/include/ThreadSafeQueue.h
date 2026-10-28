@@ -16,32 +16,42 @@ class ThreadSafeQueue{
 
 private:
     std::mutex mtx;
-    condition_variable cond_var;
+    std::condition_variable cond_var;
     std::queue<T> dataqueue;
-    bool m_isStoped = false;
+    bool m_isStopped = false;
 
 public:
 //先写生产者
-    void producer( T value){
-        
+    void push( T value){
+        {
             std::lock_guard<std::mutex> lock(mtx);
             dataqueue.push(std::move(value));
-            cond_variable.notify_one();
+        }
+            cond_var.notify_one();
     }
 
     //其次是消费者
-    bool consumer(T& value)
+    bool pop(T& value)
     {   
         std::unique_lock<std::mutex> lock(mtx);
         cond_var.wait(lock,[this]{
-            return !dataqueue.empty()
+            return !dataqueue.empty()||m_isStopped;
         });
+        if(m_isStopped && dataqueue.empty())
+        {
+            return false;
+        }
         //取出然后释放空间
         value = std::move(dataqueue.front());
         dataqueue.pop();
         cond_var.notify_one();
 
         return true;
+    }
+    bool empty()
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        return dataqueue.empty();
     }
     void clear()
     {   
@@ -53,7 +63,7 @@ public:
     void close()
     {
         std::lock_guard<std::mutex> lock(mtx);
-        m_isStoped = true;
+        m_isStopped = true;
         cond_var.notify_all();
     }
 

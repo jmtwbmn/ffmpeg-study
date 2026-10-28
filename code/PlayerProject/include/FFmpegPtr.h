@@ -20,7 +20,7 @@ extern "C"
 
 // AVFrame
 struct AVFrameDeleter {
-    void operator()(AVFrame* frame) const {
+    void operator()(AVFrame* frame) const { 
         if (frame) av_frame_free(&frame);
     }
 };
@@ -104,3 +104,11 @@ struct SDL_TextureDeleter {
     }
 };
 using SDL_TexturePtr = std::unique_ptr<SDL_Texture, SDL_TextureDeleter>; 
+
+//输出上下文:释放方式是 avformat_free_context,不是 avformat_close_input
+struct AVFormatContextOutDeleter {
+    void operator()(AVFormatContext* ctx) const {
+        if (ctx) avformat_free_context(ctx);
+    }
+};
+using AVFormatContextOutPtr = std::unique_ptr<AVFormatContext, AVFormatContextOutDeleter>;

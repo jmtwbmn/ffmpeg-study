@@ -4,6 +4,7 @@
 #include "FFmpegPtr.h"
 #include "ThreadSafeQueue.h"
 #include "AudioPlayer.h"
+#include "Player.h"
 
     VideoRenderer::VideoRenderer()
     {
@@ -36,7 +37,7 @@ bool VideoRenderer::init(AVCodecParameters* video_codec_par,AudioPlayer* audiopl
 
     bool VideoRenderer::sdl_init(int width,int height)
     {   
-
+        //SDL在audioPlayer中已经初始化了，重复初始化会出错
        
         SDL_Window* rawwindow = SDL_CreateWindow(
             "audio.player",
@@ -117,18 +118,16 @@ bool VideoRenderer::init(AVCodecParameters* video_codec_par,AudioPlayer* audiopl
 
     //入队函数
     void VideoRenderer::pushvideoFrame(AVFramePtr video_frame)
-    {
+    {   //丢帧逻辑,防止视频队列过快
+        while(videoframeQueue.size() >= m_maxQueueFrames)
+        {
+            AVFramePtr dropped;
+            if(!videoframeQueue.try_pop(dropped)) break;
+        }
         videoframeQueue.push(std::move(video_frame));
     }
 
     //线程控制
-    void VideoRenderer::play()
-    {
-       
-        m_isPaused = false;
-        m_isRunning = true;
-        
-    }
     void VideoRenderer::pause()
        { m_isPaused = true;}
 
@@ -141,46 +140,69 @@ bool VideoRenderer::init(AVCodecParameters* video_codec_par,AudioPlayer* audiopl
     m_isPaused = true;
 
     videoframeQueue.clear();
-
+    m_pendingFrame.reset();
+   
     std::cout << "视频渲染已停止" << std::endl;
 }
     void VideoRenderer::clearqueue()
     {
         videoframeQueue.clear();
+        m_pendingFrame.reset();
         std::cout<<"清空视频队列成功"<<std::endl;
     }
 
-    //渲染
+    //渲染一帧
    void VideoRenderer::renderOneFrame()
 {
     if(!m_isRunning || m_isPaused)
         return;
+ 
+    //优化，每次队列先看后取，音频钟到了再取出，避免队列堵塞丢帧
+    int64_t frontPts = AV_NOPTS_VALUE;
+    if(!videoframeQueue.peek([&](AVFramePtr& f){ frontPts = f->pts;}))
+    return;
 
-    AVFramePtr video_frame;
+    double video_pts_seconds = (frontPts != AV_NOPTS_VALUE)
+            ? frontPts * av_q2d(m_timebase) - m_baseTime : 0.0;
 
-    if(!videoframeQueue.pop(video_frame))
+    //获取当前音频时间钟
+    double audio_clock = 0.0;
+    if(audioplayer)
+    {
+        audio_clock = audioplayer->get_clock();
+    }
+    //没有音频流或者音频钟没起来时,退化成系统时钟
+    if(!audioplayer || audio_clock <= 0.0)
+    {   
+        if(m_startTicks == 0) m_startTicks = SDL_GetTicks64();
+        audio_clock = (SDL_GetTicks64() - m_startTicks) /1000.0;
+    }
+    double delay = video_pts_seconds - audio_clock;
+
+    if(delay>0.005) return;   //提前了，队列不动
+    if(!videoframeQueue.try_pop(m_pendingFrame)) return;//到点了才取出
+    if(delay<-0.15)           //延迟太多了，丢帧
+    {
+        m_pendingFrame.reset();
         return;
-
-    std::cout << "主线程拿到视频帧"
-              << " width=" << video_frame->width
-              << " height=" << video_frame->height
-              << " format=" << video_frame->format
-              << std::endl;
-
+    }
+      
+   
     int scaled_height = sws_scale(
         sws_ctx.get(),
-        video_frame->data,
-        video_frame->linesize,
+        m_pendingFrame->data,
+        m_pendingFrame->linesize,
         0,
         height,
         yuv420p->data,
         yuv420p->linesize
     );
-
-    std::cout << "sws_scale完成，返回高度="
-              << scaled_height
-              << std::endl;
-
+    if(scaled_height <0 )
+    {   
+        std::cerr<<"视频帧渲染失败"<<std::endl;
+        return;
+    }
+  
     if(SDL_UpdateYUVTexture(
         texture.get(),
         nullptr,
@@ -218,11 +240,18 @@ bool VideoRenderer::init(AVCodecParameters* video_codec_par,AudioPlayer* audiopl
                   << std::endl;
         return;
     }
-
-    SDL_RenderPresent(renderer.get());
+    m_frameDrawn = true;
+    m_pendingFrame.reset();
 }
-    
 
-
+ void VideoRenderer::play()
+ {  
+    if(m_isRunning)
+    {return;}
+    m_isRunning = true;
+    m_isPaused = false;
+    m_startTicks = SDL_GetTicks64(); //记下起点，now-起点就是已播秒数
+   
+ }
 
 

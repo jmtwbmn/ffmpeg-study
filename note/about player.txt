@@ -19,3 +19,24 @@
 今天遇到的问题就是比较奇怪了，代码整完有音频但是播放框是黑屏的，然后ai找了问题。当初在设计的时候是打算的解码和渲染线程分开实现，然后
 今天发现的是sdl的上下文窗口不能跨线程使用，要想实现只能创建完整的独立渲染线程。但是也会面临其他的问题，然后解决方法就算是把渲染
 改到了主线程进行。
+
+10-20 今天真正理解了黑屏的问题，窗口初始化和视频渲染必须要在一个线程下进行。原来的机构是，main调用player.play()和play.open()，play()是启动了VideoRender里的renderoneframe
+ 也就是视频渲染线程，然后open()启动的是VideoRender.init()，也就是窗口初始化线程，所以会黑屏。解决方法有两个，一是把视频渲染线程放在主线程，也就是删除play里面的m_videoRender.play()
+ 的调用，改为在主线程调用。二就是直接把窗口初始化和视频渲染线程放在一个线程里(init).
+ 同时，方法1在player类定义的对外接口,调度renderoneframe，然后主函数调用这个接口，确保封装和安全。
+
+10-22 今天改进进度条得到的一些理解。第一个就是进度条，以左上角作为坐标原点，x,y,w,h.x,y是顶点的一个坐标
+    两个参数,bg_width和margin，前者是进度条的宽度，margin的设计是为了更好的对称以及修改，边距，距离
+    上下以及右的距离，所以w就是bg_width,h就是window_height-margin*2；
+    第二个就是鼠标控制了，光看状态函数m_isDragging，mousedown和mousemove直观会理解成按下，移动，然后m_isDragging
+    就是false和true.事实上，鼠标按下的这一下才开始拖动，否则的话鼠标随意滑动就会改变进度，所以是down的时候true，
+    move的时候false.同时，move,up,down的返回值用法都不一样，down返回值是判断是否点到进度条，move返回值代表计算了seekTime,
+    后续可以用来预览，up返回值代表seek.最后要在av_read_frame线程和av_seek_frame间加锁防冲突。取消视频渲染videorenderer的play，改为主线程一起调度。
+
+10-27
+    对于昨天音画复习的一些感悟；第一个就是pcmbuf和pcmpos，len和written，len是回调函数每次需要的数据，written是已经提供的数据
+    pcmbuf是音频convert转换完存储的数据，pcmpos是数据里的排序，为了精准的每次提供数据，copy=min(pcmbuf-pcmpos,len-written)
+    确保不会多余而丢帧，少了可以补静音。每次处理完+=copy,在填充完重置written,进入函数前重置pcmpos.
+    第二个音频队列的处理，三个参数，timebase,basetime,以及pts钟。第一个timebase是视频流处理时得到的一个参数，用于转换pts和时间，
+    每局计算一次，basetime是第一个处理包时得到的pts时间，最后就是pts钟，解析每一帧音频数据得到对应的pts帧，pts时间-basetime就是
+    准确的audio_clock,同时由于音频队列处理每次存在延迟，所以再减去延迟的时间就是不断更新且精准的音频钟。

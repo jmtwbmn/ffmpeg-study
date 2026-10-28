@@ -71,5 +71,7 @@
    if(codec_ctx.get())
    {
     avcodec_flush_buffers(codec_ctx.get());
+    std::cout<<"刷新缓冲区失败"<<std::endl;
    }
+   
  }
