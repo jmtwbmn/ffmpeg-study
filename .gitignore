@@ -31,6 +31,9 @@ sdl_image
 sdl_black_window
 ffmpeg_decode
 
+# 网络编程练习的编译产物
+code/net_study/v*
+
 # CMake 源码内构建产物
 CMakeCache.txt
 CMakeFiles/
