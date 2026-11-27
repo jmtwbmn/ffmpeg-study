@@ -79,7 +79,7 @@ int flush_sendq(Conn& c)
     {
         ssize_t n = send(c.fd,c.sendq.data()+c.sent,c.sendq.size()-c.sent,MSG_NOSIGNAL);
         if(n>0){ c.sent += n; continue;}        //没发完继续发
-        if(n ==1 && errno == EINTR) continue;   //打断了重试
+        if(n == -1 && errno == EINTR) continue;   //打断了重试
         if(n==-1 && (errno == EAGAIN || errno == EWOULDBLOCK))
         return 0;       //堵塞了，等待EPOLLOUT
         return -1;
@@ -91,7 +91,9 @@ int flush_sendq(Conn& c)
 
 int main()
 {   
-    
+    // 4MB ≈ 2 秒 1080p 积压。超过说明对端已经跟不上，留着只会吃内存。
+    static const size_t HIGH_WATER_MARK = 4 * 1024 * 1024;
+
     
     //提前声明容器，贯穿全局
     std::unordered_map<int,Conn> map1;
@@ -144,10 +146,6 @@ int main()
     //设置非阻塞
     int flags = fcntl(server_fd,F_GETFL);
     fcntl(server_fd,F_SETFL,flags | O_NONBLOCK);
-
-    //设置写入缓冲区的标志
-    int flag2 = fcntl(server_fd,F_GETFL);
-    fcntl(server_fd,F_SETFL,flag2 | EPOLLOUT);
 
     //4.等待客户端连接(三次握手)
     sockaddr_in client_addr{};
@@ -204,38 +202,35 @@ int main()
             {   
                 int fd = evs[i].data.fd;
                 auto it = map1.find(fd);
-                if(it == map1.end()) continue;      //不认识的fd，跳过
+                if(it == map1.end()) continue;  //不认识的fd，跳过
 
                 Conn& conn = it->second;
 
                 //1.处理可写，把积压的发了
                 if(evs[i].events & EPOLLOUT)
                 {
-                    if(flush_sendq(conn) == -1)
-                    {
-                        //坏了，修复
-                        epoll_ctl(epoll_fd,EPOLL_CTL_DEL,fd,NULL);
-                        close(fd);
-                        map1.erase(it);
-                        continue;
-                    }
-                    //队列空了摘掉EPOLLOUT
-                    if(conn.sent >= conn.sendq.size())
-                    {
-                        struct epoll_event wev;
-                        wev.events = EPOLLIN | EPOLLET;
-                        wev.data.fd = fd;
-                        epoll_ctl(epoll_fd,EPOLL_CTL_MOD,fd,&wev);
-                    }
+                   ssize_t n =  flush_sendq(conn);
+                   if( n==-1 )  //发生错误，需要处理
+                   {
+                    epoll_ctl(epoll_fd,EPOLL_CTL_DEL,fd,NULL);
+                    close(fd);
+                    map1.erase(it);
+                    continue;
+                   }
+                   if(conn.sent >= conn.sendq.size())   //队列空了摘掉EPOLLOUT，否则空转CPU
+                   {
+                    struct epoll_event wev;
+                    wev.events = EPOLLIN | EPOLLET;
+                    wev.data.fd = fd;
+                    epoll_ctl(epoll_fd,EPOLL_CTL_MOD,fd,&wev);
+                   }
                 }
                 //2.处理可读
-               printf("已连接的老客户端有新数据\n");
-                int fd = evs[i].data.fd;
+                if(evs[i].events & EPOLLIN)
+               {    
+                    printf("已连接的老客户端有新数据\n");
                 while(1)
                 {   
-                //设置send标记位
-                int flag2 = fcntl(server_fd,F_GETFL);
-
                 //1.查map1,发现是已知的客户端
                 int bytes = recv(fd,buffer,sizeof(buffer),0);
                 if(bytes>0)
@@ -244,6 +239,29 @@ int main()
                 std::cout<<"收到"<<bytes<<"个字节";
                 std::cout.write(buffer,bytes);      //输出bytes长度的内容
                 std::cout<<std::endl;
+
+                if((queue_send(conn,buffer,bytes))==-1)
+                {   //发生错误，清理
+                    epoll_ctl(epoll_fd,EPOLL_CTL_DEL,fd,NULL);
+                    close(fd);
+                    map1.erase(it);
+                    break;
+                }
+                if(conn.sendq.size()> HIGH_WATER_MARK)
+                {   //超过队列大小太多，剔除防止客户端接收内存爆了
+                    std::cout<<"发送队列堆积过多，进行剔除"<<std::endl;
+                    epoll_ctl(epoll_fd,EPOLL_CTL_DEL,fd,NULL);
+                    close(fd);
+                    map1.erase(it);
+                    break;
+                }
+                if(conn.sent < conn.sendq.size())
+                {
+                    struct epoll_event mev;
+                    mev.events = EPOLLOUT | EPOLLIN | EPOLLET;
+                    mev.data.fd = fd;
+                epoll_ctl(epoll_fd,EPOLL_CTL_MOD,fd,&mev);
+                }
                 continue;
                 }
                 else if (bytes == 0)
@@ -267,18 +285,13 @@ int main()
                     break;
                 }
                  
-
              }
-               
-
-                  
-              }
-
-
-
-               
+                    
             }
+ 
+          }
         }
+    }
     //6.关闭socket(四次挥手)
     /*
     close(server_fd);
